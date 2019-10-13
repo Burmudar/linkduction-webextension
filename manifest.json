@@ -1,0 +1,20 @@
+{
+    "manifest_version": 2,
+    "name": "linkduction",
+    "version": "1.0",
+    "icons": {
+        "48": "icons/abduction.svg"
+    },
+    "description": "Opens links in new tabs sent to it over the wire!",
+    "permissions": [
+        "<all_urls>",
+        "ws://*/*",
+        "webRequest",
+        "tabs"
+    ],
+    "background": 
+        {
+            "page": "background.html"
+        }
+    
+}
