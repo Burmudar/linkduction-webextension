@@ -18,7 +18,7 @@ let encoder = new TextEncoder();
 let replyJSON = (obj) => {
     let data = encoder.encode(JSON.stringify(obj));
     return ws.send(data)
-}
+};
 
 let handleData = (d) => {
     let dec = new TextDecoder();
@@ -26,7 +26,7 @@ let handleData = (d) => {
     msg = JSON.parse(result);
 
     handleMsg(msg);
-}
+};
 
 let handleMsg = (msg) => {
     switch(msg.Type) {
@@ -37,12 +37,23 @@ let handleMsg = (msg) => {
         default:
             console.log(msg);
     }
+};
+
+function formatKey(k) {
+    let lastProtoPos = k.search("://") + 3; // search will return pos of ':' so plus 3 to get first char after //
+    if (lastProtoPos>= 0) {
+        return k.slice(lastProtoPos);
+    }
+
+    return k;
 }
 
 function onTabCreated(url, tab) {
-    console.log(`k:${url} v: ${tab}`)
+    let key = formatKey(url);
+    console.log(`k:${key} v: ${tab}`)
     //we just have to store the tab id - the tab object is immutable so won't get updated on tab state changes
-    tabTracker = tabTracker.set(url, tab);
+    
+    tabTracker = tabTracker.set(key, tab);
 }
 
 function onError(err) {
@@ -55,19 +66,36 @@ function createTab(url) {
     creating.then((tab) => onTabCreated(url, tab), onError);
 }
 
+async function activateTab(tab) {
+
+    console.info(`Activate tab: ${tab.id}`);
+    let updating = await browser.tabs.update(tab.id, {active: true});
+    return updating;
+
+}
+
+async function findTab(tab) {
+    let result = await browser.tabs.query({index: tab.index, windowId: tab.windowId});
+    if (!result.length === 0) {
+        throw new Error(`Tab not found -> id ${tab.id} index: ${tab.index} url: ${tab.url} title: ${tab.title}`);
+    }
+    console.info(`Found Tab: ${result[0].id}`);
+    return result[0];
+}
+
 let handleLinkMsg = (linkMsg) => {
     // Have to use the promise tabs api
     console.log(`Opening link: ${linkMsg.URL}`);
-    if (tabTracker.has(linkMsg.URL)) {
-        let tab = tabTracker.get(linkMsg.URL);
-        console.table(tab)
-        console.info("==========");
-        browser.tabs.get(tab.id).then((tab) => {
-            console.table(tab)
-            if (tab.highlighted) {
+    let key = formatKey(linkMsg.URL);
+    console.log(`Tab key: ${key}`);
+    if (tabTracker.has(key)) {
+        let storedTab = tabTracker.get(key);
+        findTab(storedTab).then((tab) => {
+            console.log(tab);
+             if (tab.highlighted) {
                 createTab(linkMsg.URL);
             } else {
-                browser.tabs.update(tab.id, {active: true}).then(() => {console.log(`Tab ${tab.id} activated`)}, onError);
+                activateTab(tab).then((t) => {console.log(`Tab ${t.id} activated`)}, onError);
             }
         }, onError)
     } else {
